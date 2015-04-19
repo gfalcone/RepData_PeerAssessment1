@@ -8,18 +8,84 @@ output:
 
 ## Loading and preprocessing the data
 
-
+```{r, echo=TRUE}
+unzip("./activity.zip")  
+data <- read.csv("activity.csv")
+file.remove("activity.csv")
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r, echo=TRUE}
+library(dplyr)
+data_processed <- na.omit(data)
+steps_by_day <- group_by(data_processed,date)
+steps_by_day <- summarise(steps_by_day, sum(steps))
+names(steps_by_day)[2] <- "sum_steps"
+hist(steps_by_day$sum_steps, xlab="Total of steps taken each day", main="Histogram of steps taken each day")
+mean_steps <- summarise(steps_by_day, mean(sum_steps))
+median_steps <- summarise(steps_by_day, median(sum_steps))
+print(mean_steps)
+print(median_steps)
+```
 
 
 ## What is the average daily activity pattern?
 
-
+```{r, echo=TRUE}
+average_steps <- select(data_processed, interval, steps)
+average_steps <- aggregate(.~interval, data=average_steps, mean)
+plot(average_steps$interval,average_steps$steps, type="l", xlab="Interval", ylab="Average of steps of interval across days")
+print(head(average_steps))
+print(average_steps[which.max(average_steps$average),])
+```
 
 ## Imputing missing values
 
-
+```{r, echo=TRUE}
+print(sum(is.na(data)))
+mean_for_interval <- na.omit(data)
+mean_for_interval <- group_by(mean_for_interval, interval)
+mean_for_interval <- summarise(mean_for_interval, mean=mean(steps))
+proper_data <- data
+for(i in 1:nrow(proper_data)){
+    if(is.na(proper_data[i,1])){
+        interval <- proper_data[i,3]
+        tmp <- mean_for_interval[mean_for_interval$interval == interval,]
+        proper_data[i,1] <- tmp$mean
+    }
+}
+print(head(proper_data))
+proper_data <- group_by(proper_data, date)
+proper_data <- summarise(proper_data, sum=sum(steps))
+print(proper_data)
+hist(proper_data$sum, xlab="Total of steps taken each day", main="Histogram of steps taken each day")
+print(mean(proper_data$sum))
+print(median(proper_data$sum))
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+Sys.setlocale("LC_TIME", "C")
+week <- mutate(data_processed, weekday=weekdays(as.Date(date)))
+for(i in 1:nrow(week)){
+    if(week[i,4] == "Saturday" | week[i,4] == "Sunday"){
+        week[i,4] <- "Weekend"
+    }else{
+        week[i,4] <- "Weekday"
+    }
+}
+week <- group_by(week, date)
+average_steps <- mutate(week, average=steps/n())
+weekday <- subset(week, weekday=="Weekday")
+weekend <- subset(week, weekday=="Weekend")
+
+weekday <- select(weekday, interval, steps)
+weekday <- aggregate(.~interval, data=weekday, mean)
+weekend <- select(weekend, interval, steps)
+weekend <- aggregate(.~interval, data=weekend, mean)
+
+par(mfrow=c(2,1))
+plot(weekday$interval,weekday$steps, type="l", xlab="Interval", ylab="Average steps", main="Average of steps of interval across weekdays")
+plot(weekend$interval,weekend$steps, type="l", xlab="Interval", ylab="Average steps", main="Average of steps of interval across weekends")
+```
